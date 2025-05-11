@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Camera Capture with Location</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  </head>
+  <body class="bg-neutral-100 min-h-svh pt-10">
+    <div class="container bg-white max-w-[500px] mx-auto">
+      <div class="px-5 pt-5">
+        <div class="flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M12.275 9H19.4q-.675-1.725-2.062-2.963T14.15 4.3l-2.3 3.95q-.15.25 0 .5t.425.25m-3.6 1.25q.15.25.425.25t.425-.25L13.1 4.1q-.275-.05-.55-.075T12 4q-1.65 0-3.075.625T6.4 6.3zM4.25 14h4.575q.275 0 .438-.25t.012-.5L5.7 7.1q-.8 1.025-1.25 2.263T4 12q0 .525.063 1.013T4.25 14m5.6 5.7l2.275-3.95q.15-.25-.012-.5t-.438-.25H4.6q.675 1.725 2.063 2.963T9.85 19.7M12 20q1.65 0 3.075-.625T17.6 17.7l-2.275-3.95q-.15-.25-.425-.25t-.425.25L10.9 19.9q.275.05.538.075T12 20m6.3-3.1q.8-1.025 1.25-2.262T20 12q0-.525-.062-1.012T19.75 10h-4.575q-.275 0-.437.25t-.013.5zM12 22q-2.05 0-3.875-.788t-3.187-2.15t-2.15-3.187T2 12q0-2.075.788-3.887t2.15-3.175t3.187-2.15T12 2q2.075 0 3.888.788t3.174 2.15t2.15 3.175T22 12q0 2.05-.788 3.875t-2.15 3.188t-3.175 2.15T12 22"
+            />
+          </svg>
+          <h1 class="font-semibold text-xl text-neutral-800 ml-2">GeoTagger</h1>
+          <p class="text-[10px] text-neutral-500 ml-auto tracking-[2px]">EDUCATIONAL PURPOSES</p>
+        </div>
+      </div>
+      <div class="px-5 mt-3">
+        <p class="text-neutral-600 text-sm leading-6">
+          A web-based tool that captures photos directly from your device camera, automatically embedding the current GPS coordinates and IP address
+          into the image. Ideal for field reporting, documentation, and digital evidence collection.
+        </p>
+      </div>
+      <div class="mt-5">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas" class="max-w-[500px]" style="display: none"></canvas>
+      </div>
+      <div class="p-4 items-center justify-center gap-4">
+        <button id="captureBtn" class="bg-neutral-800 text-sm text-white py-2 px-5 w-fit rounded-lg">Capture Photo</button>
+        <button id="downloadBtn" class="bg-neutral-800 text-sm text-white py-2 px-5 w-fit rounded-lg" style="display: none">Download Photo</button>
+        <button id="reCapture" class="bg-neutral-200 text-sm py-2 px-5 w-fit rounded-lg" style="display: none">Recapture</button>
+      </div>
+      <div class="p-5 flex items-center">
+        <a href="https://github.com/priyangsubanerjee/device-fingerprinting" class="flex items-center gap-2 text-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5c.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34c-.46-1.16-1.11-1.47-1.11-1.47c-.91-.62.07-.6.07-.6c1 .07 1.53 1.03 1.53 1.03c.87 1.52 2.34 1.07 2.91.83c.09-.65.35-1.09.63-1.34c-2.22-.25-4.55-1.11-4.55-4.92c0-1.11.38-2 1.03-2.71c-.1-.25-.45-1.29.1-2.64c0 0 .84-.27 2.75 1.02c.79-.22 1.65-.33 2.5-.33s1.71.11 2.5.33c1.91-1.29 2.75-1.02 2.75-1.02c.55 1.35.2 2.39.1 2.64c.65.71 1.03 1.6 1.03 2.71c0 3.82-2.34 4.66-4.57 4.91c.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2"
+            />
+          </svg>
+          <span>Source code</span>
+        </a>
+        <a href="https://priyangsu.dev/" class="flex items-center gap-0 text-sm ml-auto">
+          <span class="text-neutral-500">project by</span>
+          <span class="flex items-center border-b border-dashed border-neutral-300 ml-3">
+            <img src="./assets/priyangsu-avatar.svg" class="h-10 -ml-2" />
+            <span class="-ml-1">priyangsubanerjee</span>
+          </span>
+        </a>
+      </div>
+    </div>
+
+    <script>
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const captureBtn = document.getElementById("captureBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const reCaptureBtn = document.getElementById("reCapture");
+      const ctx = canvas.getContext("2d");
+
+      // Access the camera
+      navigator.mediaDevices
+        .getUserMedia({ video: true })
+        .then((stream) => {
+          video.srcObject = stream;
+        })
+        .catch((err) => {
+          alert("Camera access denied or not available.");
+          console.error(err);
+        });
+
+      captureBtn.addEventListener("click", async () => {
+        // Set canvas dimensions
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Draw the current frame from video
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Fetch IP address
+        let ipText = "IP: Unknown";
+        try {
+          const ipRes = await fetch("https://api.ipify.org?format=json");
+          const ipData = await ipRes.json();
+          ipText = `IP: ${ipData.ip}`;
+        } catch (e) {
+          console.warn("Could not fetch IP", e);
+        }
+
+        // Get location
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = pos.coords.latitude.toFixed(5);
+              const lon = pos.coords.longitude.toFixed(5);
+              const locationText = `Lat: ${lat}, Lon: ${lon}`;
+
+              // Overlay both location and IP
+              ctx.font = "20px Arial";
+              ctx.fillStyle = "white";
+              ctx.strokeStyle = "black";
+              ctx.lineWidth = 3;
+              ctx.strokeText(locationText, 10, canvas.height - 50);
+              ctx.fillText(locationText, 10, canvas.height - 50);
+
+              ctx.strokeText(ipText, 10, canvas.height - 15);
+              ctx.fillText(ipText, 10, canvas.height - 15);
+
+              canvas.style.display = "block";
+              downloadBtn.style.display = "inline-block";
+              reCaptureBtn.style.display = "inline-block";
+              captureBtn.style.display = "none"; // Hide capture button
+              const stream = video.srcObject;
+              const tracks = stream.getTracks();
+              tracks.forEach((track) => track.stop());
+              video.srcObject = null;
+              video.style.display = "none"; // Hide video after capture
+            },
+            (err) => {
+              alert("Failed to get location");
+            }
+          );
+        } else {
+          alert("Geolocation not supported.");
+        }
+      });
+
+      reCaptureBtn.addEventListener("click", () => {
+        video.style.display = "block"; // Show video again
+        captureBtn.style.display = "inline-block"; // Show capture button again
+        canvas.style.display = "none"; // Hide canvas
+        downloadBtn.style.display = "none"; // Hide download button
+        reCaptureBtn.style.display = "none"; // Hide recapture button
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then((newStream) => {
+            video.srcObject = newStream; // Start new stream
+          })
+          .catch((err) => {
+            alert("Camera access denied or not available.");
+            console.error(err);
+          });
+        video.play(); // Play the video again
+      });
+
+      downloadBtn.addEventListener("click", () => {
+        const link = document.createElement("a");
+        link.download = "photo_with_location.png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+      });
+    </script>
+  </body>
+</html>
