@@ -49,8 +49,7 @@ This project is intended for **ethical**, **transparent**, and **privacy-respect
 
 ### Live Demo
 
-Try the tool live at:  
-[View Live](https://priyangsubanerjee.github.io/geotagger/)
+Try the tool live at: [View Live](https://priyangsubanerjee.github.io/geo-tagger/)
 
 ### Author
 
