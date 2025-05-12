@@ -69,14 +69,17 @@
       let currentDeviceId = null;
       let videoDevices = [];
       let deviceIndex = 0;
+      let facingMode = "user"; // Front camera by default
 
-      async function startCamera(deviceId = null) {
+      async function startCamera(facingMode = "user") {
         if (currentStream) {
           currentStream.getTracks().forEach((track) => track.stop());
         }
 
         const constraints = {
-          video: deviceId ? { deviceId: { exact: deviceId } } : true,
+          video: {
+            facingMode: facingMode,
+          },
           audio: false,
         };
 
@@ -104,10 +107,12 @@
       }
 
       switchBtn.addEventListener("click", async () => {
-        if (videoDevices.length <= 1) return;
+        if (videoDevices.length <= 1) return; // Only switch if there are multiple devices
 
-        deviceIndex = (deviceIndex + 1) % videoDevices.length;
-        await startCamera(videoDevices[deviceIndex].deviceId);
+        // Toggle facingMode between "user" and "environment"
+        facingMode = facingMode === "user" ? "environment" : "user";
+
+        await startCamera(facingMode);
       });
 
       captureBtn.addEventListener("click", async () => {
@@ -172,7 +177,7 @@
         switchBtn.style.display = "inline-block"; // Show switch button
         (async () => {
           await getVideoDevices();
-          await startCamera(videoDevices[deviceIndex]?.deviceId);
+          await startCamera(facingMode); // Restart camera with current facingMode
         })();
       });
 
@@ -185,7 +190,7 @@
 
       (async () => {
         await getVideoDevices();
-        await startCamera(videoDevices[deviceIndex]?.deviceId);
+        await startCamera(facingMode); // Start the camera with default facingMode
       })();
     </script>
   </body>
