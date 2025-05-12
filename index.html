@@ -70,7 +70,6 @@
       let videoDevices = [];
       let deviceIndex = 0;
 
-      // Access the camera
       async function startCamera(deviceId = null) {
         if (currentStream) {
           currentStream.getTracks().forEach((track) => track.stop());
@@ -110,16 +109,6 @@
         deviceIndex = (deviceIndex + 1) % videoDevices.length;
         await startCamera(videoDevices[deviceIndex].deviceId);
       });
-
-      // navigator.mediaDevices
-      //   .getUserMedia({ video: true })
-      //   .then((stream) => {
-      //     video.srcObject = stream;
-      //   })
-      //   .catch((err) => {
-      //     alert("Camera access denied or not available.");
-      //     console.error(err);
-      //   });
 
       captureBtn.addEventListener("click", async () => {
         // Set canvas dimensions
