@@ -81,7 +81,7 @@
         const constraints = isIOS
           ? {
               video: {
-                facingMode: deviceId ? (deviceIndex % 2 === 0 ? "environment" : "user") : "user",
+                facingMode: deviceId ? (deviceIndex % 2 === 0 ? "environment" : "environment") : "environment",
               },
               audio: false,
             }
