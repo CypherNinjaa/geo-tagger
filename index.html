@@ -69,6 +69,7 @@
       let currentDeviceId = null;
       let videoDevices = [];
       let deviceIndex = 0;
+      let count = 0;
 
       // Access the camera
       async function startCamera(deviceId = null) {
@@ -81,7 +82,7 @@
         const constraints = isIOS
           ? {
               video: {
-                facingMode: deviceId ? (deviceIndex % 2 === 0 ? "environment" : "environment") : "environment",
+                facingMode: count % 2 === 0 ? "environment" : "user",
               },
               audio: false,
             }
@@ -116,6 +117,7 @@
       switchBtn.addEventListener("click", async () => {
         if (videoDevices.length <= 1) return;
 
+        count++;
         deviceIndex = (deviceIndex + 1) % videoDevices.length;
         await startCamera(videoDevices[deviceIndex].deviceId);
       });
