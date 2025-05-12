@@ -115,11 +115,13 @@
       }
 
       switchBtn.addEventListener("click", async () => {
-        if (videoDevices.length <= 1) return;
-
         count++;
+        if (videoDevices.length <= 1) {
+          alert("No other camera found");
+          return;
+        }
         deviceIndex = (deviceIndex + 1) % videoDevices.length;
-        await startCamera(videoDevices[deviceIndex].deviceId);
+        await startCamera(videoDevices[deviceIndex].deviceId || null);
       });
 
       captureBtn.addEventListener("click", async () => {
