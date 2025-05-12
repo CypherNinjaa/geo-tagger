@@ -131,14 +131,10 @@
       });
 
       captureBtn.addEventListener("click", async () => {
-        // Set canvas dimensions
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Draw the current frame from video
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Fetch IP address
         let ipText = "IP: Unknown";
         try {
           const ipRes = await fetch("https://api.ipify.org?format=json");
@@ -148,7 +144,6 @@
           console.warn("Could not fetch IP", e);
         }
 
-        // Get location
         if ("geolocation" in navigator) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
@@ -156,7 +151,6 @@
               const lon = pos.coords.longitude.toFixed(5);
               const locationText = `Lat: ${lat}, Lon: ${lon}`;
 
-              // Overlay both location and IP
               ctx.font = "20px Arial";
               ctx.fillStyle = "white";
               ctx.strokeStyle = "black";
@@ -170,8 +164,8 @@
               canvas.style.display = "block";
               downloadBtn.style.display = "inline-block";
               reCaptureBtn.style.display = "inline-block";
-              video.style.display = "none"; // Hide video
-              captureBtn.style.display = "none"; // Hide capture button
+              video.style.display = "none";
+              captureBtn.style.display = "none";
               stopCamera();
             },
             (err) => {
