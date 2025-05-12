@@ -69,17 +69,15 @@
       let currentDeviceId = null;
       let videoDevices = [];
       let deviceIndex = 0;
-      let facingMode = "user"; // Front camera by default
 
-      async function startCamera(facingMode = "user") {
+      // Access the camera
+      async function startCamera(deviceId = null) {
         if (currentStream) {
           currentStream.getTracks().forEach((track) => track.stop());
         }
 
         const constraints = {
-          video: {
-            facingMode: facingMode,
-          },
+          video: deviceId ? { deviceId: { exact: deviceId } } : true,
           audio: false,
         };
 
@@ -103,22 +101,23 @@
 
       async function getVideoDevices() {
         const devices = await navigator.mediaDevices.enumerateDevices();
-        console.log(devices);
+        console.log("Devices:", devices);
         videoDevices = devices.filter((d) => d.kind === "videoinput");
       }
 
       switchBtn.addEventListener("click", async () => {
-        if (videoDevices.length <= 1) return; // Only switch if there are multiple devices
+        if (videoDevices.length <= 1) return;
 
-        // Toggle facingMode between "user" and "environment"
-        facingMode = facingMode === "user" ? "environment" : "user";
-
-        await startCamera(facingMode);
+        deviceIndex = (deviceIndex + 1) % videoDevices.length;
+        await startCamera(videoDevices[deviceIndex].deviceId);
       });
 
       captureBtn.addEventListener("click", async () => {
+        // Set canvas dimensions
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+
+        // Draw the current frame from video
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Fetch IP address
@@ -175,7 +174,7 @@
         switchBtn.style.display = "inline-block"; // Show switch button
         (async () => {
           await getVideoDevices();
-          await startCamera(facingMode); // Restart camera with current facingMode
+          await startCamera(videoDevices[deviceIndex]?.deviceId);
         })();
       });
 
@@ -188,7 +187,7 @@
 
       (async () => {
         await getVideoDevices();
-        await startCamera(facingMode);
+        await startCamera(videoDevices[deviceIndex]?.deviceId);
       })();
     </script>
   </body>
