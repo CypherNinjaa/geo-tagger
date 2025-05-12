@@ -115,10 +115,16 @@
       }
 
       switchBtn.addEventListener("click", async () => {
-        count++;
         if (videoDevices.length <= 1) {
-          alert("No other camera found");
-          return;
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          if (isIOS) {
+            count++;
+            await startCamera(null);
+            return;
+          } else {
+            alert("No other camera available");
+            return;
+          }
         }
         deviceIndex = (deviceIndex + 1) % videoDevices.length;
         await startCamera(videoDevices[deviceIndex].deviceId || null);
