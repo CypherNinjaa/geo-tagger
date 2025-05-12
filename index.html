@@ -9,7 +9,8 @@
   <body class="bg-neutral-100 min-h-svh pt-10">
     <div class="container bg-white max-w-[500px] mx-auto">
       <div class="px-5 pt-5">
-        <div class="flex items-center">
+        <div class="flex"><p class="text-[10px] text-neutral-500 ml-auto tracking-[2px]">EDUCATIONAL PURPOSES</p></div>
+        <div class="flex items-center mt-1">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-8" viewBox="0 0 24 24">
             <path
               fill="currentColor"
@@ -17,7 +18,6 @@
             />
           </svg>
           <h1 class="font-semibold text-xl text-neutral-800 ml-2">GeoTagger</h1>
-          <p class="text-[10px] text-neutral-500 ml-auto tracking-[2px]">EDUCATIONAL PURPOSES</p>
         </div>
       </div>
       <div class="px-5 mt-3">
@@ -28,10 +28,11 @@
       </div>
       <div class="mt-5">
         <video id="video" autoplay playsinline></video>
-        <canvas id="canvas" class="max-w-[500px]" style="display: none"></canvas>
+        <canvas id="canvas" class="max-w-[500px] block w-full" style="display: none"></canvas>
       </div>
       <div class="p-4 items-center justify-center gap-4">
         <button id="captureBtn" class="bg-neutral-800 text-sm text-white py-2 px-5 w-fit rounded-lg">Capture Photo</button>
+        <button id="switchBtn" class="bg-neutral-200 text-sm py-2 px-5 w-fit rounded-lg">Switch camera</button>
         <button id="downloadBtn" class="bg-neutral-800 text-sm text-white py-2 px-5 w-fit rounded-lg" style="display: none">Download Photo</button>
         <button id="reCapture" class="bg-neutral-200 text-sm py-2 px-5 w-fit rounded-lg" style="display: none">Recapture</button>
       </div>
@@ -61,18 +62,64 @@
       const captureBtn = document.getElementById("captureBtn");
       const downloadBtn = document.getElementById("downloadBtn");
       const reCaptureBtn = document.getElementById("reCapture");
+      const switchBtn = document.getElementById("switchBtn");
       const ctx = canvas.getContext("2d");
 
+      let currentStream = null;
+      let currentDeviceId = null;
+      let videoDevices = [];
+      let deviceIndex = 0;
+
       // Access the camera
-      navigator.mediaDevices
-        .getUserMedia({ video: true })
-        .then((stream) => {
+      async function startCamera(deviceId = null) {
+        if (currentStream) {
+          currentStream.getTracks().forEach((track) => track.stop());
+        }
+
+        const constraints = {
+          video: deviceId ? { deviceId: { exact: deviceId } } : true,
+          audio: false,
+        };
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          currentStream = stream;
           video.srcObject = stream;
-        })
-        .catch((err) => {
-          alert("Camera access denied or not available.");
-          console.error(err);
-        });
+          video.play();
+        } catch (err) {
+          console.error("Camera error:", err);
+        }
+      }
+
+      function stopCamera() {
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach((track) => track.stop());
+          video.srcObject = null;
+          switchBtn.style.display = "none"; // Hide switch button
+        }
+      }
+
+      async function getVideoDevices() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter((d) => d.kind === "videoinput");
+      }
+
+      switchBtn.addEventListener("click", async () => {
+        if (videoDevices.length <= 1) return;
+
+        deviceIndex = (deviceIndex + 1) % videoDevices.length;
+        await startCamera(videoDevices[deviceIndex].deviceId);
+      });
+
+      // navigator.mediaDevices
+      //   .getUserMedia({ video: true })
+      //   .then((stream) => {
+      //     video.srcObject = stream;
+      //   })
+      //   .catch((err) => {
+      //     alert("Camera access denied or not available.");
+      //     console.error(err);
+      //   });
 
       captureBtn.addEventListener("click", async () => {
         // Set canvas dimensions
@@ -114,12 +161,9 @@
               canvas.style.display = "block";
               downloadBtn.style.display = "inline-block";
               reCaptureBtn.style.display = "inline-block";
+              video.style.display = "none"; // Hide video
               captureBtn.style.display = "none"; // Hide capture button
-              const stream = video.srcObject;
-              const tracks = stream.getTracks();
-              tracks.forEach((track) => track.stop());
-              video.srcObject = null;
-              video.style.display = "none"; // Hide video after capture
+              stopCamera();
             },
             (err) => {
               alert("Failed to get location");
@@ -136,16 +180,11 @@
         canvas.style.display = "none"; // Hide canvas
         downloadBtn.style.display = "none"; // Hide download button
         reCaptureBtn.style.display = "none"; // Hide recapture button
-        navigator.mediaDevices
-          .getUserMedia({ video: true })
-          .then((newStream) => {
-            video.srcObject = newStream; // Start new stream
-          })
-          .catch((err) => {
-            alert("Camera access denied or not available.");
-            console.error(err);
-          });
-        video.play(); // Play the video again
+        switchBtn.style.display = "inline-block"; // Show switch button
+        (async () => {
+          await getVideoDevices();
+          await startCamera(videoDevices[deviceIndex]?.deviceId);
+        })();
       });
 
       downloadBtn.addEventListener("click", () => {
@@ -154,6 +193,11 @@
         link.href = canvas.toDataURL("image/png");
         link.click();
       });
+
+      (async () => {
+        await getVideoDevices();
+        await startCamera(videoDevices[deviceIndex]?.deviceId);
+      })();
     </script>
   </body>
 </html>
