@@ -116,11 +116,8 @@
       });
 
       captureBtn.addEventListener("click", async () => {
-        // Set canvas dimensions
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Draw the current frame from video
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Fetch IP address
@@ -190,7 +187,7 @@
 
       (async () => {
         await getVideoDevices();
-        await startCamera(facingMode); // Start the camera with default facingMode
+        await startCamera(facingMode);
       })();
     </script>
   </body>
