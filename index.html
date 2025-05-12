@@ -76,10 +76,19 @@
           currentStream.getTracks().forEach((track) => track.stop());
         }
 
-        const constraints = {
-          video: deviceId ? { deviceId: { exact: deviceId } } : true,
-          audio: false,
-        };
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        const constraints = isIOS
+          ? {
+              video: {
+                facingMode: deviceId ? (deviceIndex % 2 === 0 ? "environment" : "user") : "user",
+              },
+              audio: false,
+            }
+          : {
+              video: deviceId ? { deviceId: { exact: deviceId } } : true,
+              audio: false,
+            };
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -90,7 +99,6 @@
           console.error("Camera error:", err);
         }
       }
-
       function stopCamera() {
         if (video.srcObject) {
           video.srcObject.getTracks().forEach((track) => track.stop());
