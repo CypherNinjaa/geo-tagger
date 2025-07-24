@@ -1,0 +1,22 @@
+{
+	"name": "smart-attendance-system",
+	"version": "1.0.0",
+	"description": "An intelligent attendance system with facial recognition and GPS verification",
+	"main": "server.js",
+	"scripts": {
+		"start": "node server.js",
+		"dev": "node server.js"
+	},
+	"dependencies": {
+		"express": "^4.18.2"
+	},
+	"keywords": [
+		"attendance",
+		"facial-recognition",
+		"gps",
+		"face-api",
+		"geolocation"
+	],
+	"author": "Vikash",
+	"license": "MIT"
+}

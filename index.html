@@ -4,8 +4,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Camera Capture with Location</title>
+  <title>Smart Attendance System</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="./face-api.min.js"></script>
 </head>
 
 <body class="bg-neutral-100 min-h-svh md:pt-10">
@@ -19,14 +20,13 @@
           <path fill="currentColor"
             d="M12.275 9H19.4q-.675-1.725-2.062-2.963T14.15 4.3l-2.3 3.95q-.15.25 0 .5t.425.25m-3.6 1.25q.15.25.425.25t.425-.25L13.1 4.1q-.275-.05-.55-.075T12 4q-1.65 0-3.075.625T6.4 6.3zM4.25 14h4.575q.275 0 .438-.25t.012-.5L5.7 7.1q-.8 1.025-1.25 2.263T4 12q0 .525.063 1.013T4.25 14m5.6 5.7l2.275-3.95q.15-.25-.012-.5t-.438-.25H4.6q.675 1.725 2.063 2.963T9.85 19.7M12 20q1.65 0 3.075-.625T17.6 17.7l-2.275-3.95q-.15-.25-.425-.25t-.425.25L10.9 19.9q.275.05.538.075T12 20m6.3-3.1q.8-1.025 1.25-2.262T20 12q0-.525-.062-1.012T19.75 10h-4.575q-.275 0-.437.25t-.013.5zM12 22q-2.05 0-3.875-.788t-3.187-2.15t-2.15-3.187T2 12q0-2.075.788-3.887t2.15-3.175t3.187-2.15T12 2q2.075 0 3.888.788t3.174 2.15t2.15 3.175T22 12q0 2.05-.788 3.875t-2.15 3.188t-3.175 2.15T12 22" />
         </svg>
-        <h1 class="font-semibold text-xl text-neutral-800 ml-2">GeoTagger</h1>
+        <h1 class="font-semibold text-xl text-neutral-800 ml-2">Smart Attendance</h1>
       </div>
     </div>
     <div class="px-5 mt-3">
       <p class="text-neutral-600 text-sm leading-6">
-        A web-based tool that captures photos directly from your device camera, automatically embedding the current GPS
-        coordinates and IP address
-        into the image. Ideal for field reporting, documentation, and digital evidence collection.
+        An intelligent attendance system that uses facial recognition and GPS location verification.
+        Register your face on first capture, then check attendance with automatic face and location matching.
       </p>
     </div>
     <div class="mt-5">
@@ -34,14 +34,16 @@
       <canvas id="canvas" class="max-w-[500px] block w-full" style="display: none"></canvas>
     </div>
     <div class="p-4 items-center justify-center gap-4">
-      <button id="captureBtn" class="bg-neutral-800 text-sm text-white py-2 px-5 w-fit rounded-lg">Capture
-        Photo</button>
+      <button id="captureBtn" class="bg-neutral-800 text-sm text-white py-2 px-5 w-fit rounded-lg">Mark
+        Attendance</button>
       <button id="switchBtn" class="bg-neutral-200 text-sm py-2 px-5 w-fit rounded-lg">Switch camera</button>
       <button id="downloadBtn" class="bg-neutral-800 text-sm text-white py-2 px-5 w-fit rounded-lg"
         style="display: none">Download Photo</button>
       <button id="reCapture" class="bg-neutral-200 text-sm py-2 px-5 w-fit rounded-lg"
         style="display: none">Recapture</button>
+      <button id="resetData" class="bg-red-600 text-sm text-white py-2 px-5 w-fit rounded-lg">Reset Data</button>
       <div id="locationStatus" class="text-xs text-neutral-500 mt-2" style="display: none">🌍 Getting location...</div>
+      <div id="attendanceStatus" class="text-xs mt-2" style="display: none"></div>
     </div>
     <div class="p-5 flex flex-wrap gap-4 items-center">
       <a href="https://github.com/priyangsubanerjee/geo-tagger" class="flex items-center gap-2 text-sm">
@@ -68,7 +70,9 @@
     const downloadBtn = document.getElementById("downloadBtn");
     const reCaptureBtn = document.getElementById("reCapture");
     const switchBtn = document.getElementById("switchBtn");
+    const resetDataBtn = document.getElementById("resetData");
     const locationStatus = document.getElementById("locationStatus");
+    const attendanceStatus = document.getElementById("attendanceStatus");
     const ctx = canvas.getContext("2d");
 
     let currentStream = null;
@@ -76,6 +80,97 @@
     let videoDevices = [];
     let deviceIndex = 0;
     let count = 2;
+    let isModelsLoaded = false;
+    let isRegistered = false;
+
+    // Face-api.js configuration
+    const MODEL_URL = './weights';
+    const FACE_MATCH_THRESHOLD = 0.6; // Lower means stricter matching
+    const LOCATION_MATCH_THRESHOLD = 100; // meters
+
+    // Load face-api.js models
+    async function loadModels() {
+      try {
+        locationStatus.style.display = "block";
+        locationStatus.textContent = "📥 Loading AI models...";
+
+        await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
+        isModelsLoaded = true;
+        locationStatus.style.display = "none";
+
+        // Check if user is already registered
+        const registeredData = localStorage.getItem('attendanceRegistration');
+        if (registeredData) {
+          isRegistered = true;
+          captureBtn.textContent = "Mark Attendance";
+          showAttendanceStatus("✅ User registered. Ready for attendance!", "text-green-600");
+        } else {
+          captureBtn.textContent = "Register Face";
+          showAttendanceStatus("📝 Please register your face first", "text-blue-600");
+        }
+      } catch (error) {
+        console.error('Error loading models:', error);
+        showAttendanceStatus("❌ Error loading AI models", "text-red-600");
+      }
+    }
+
+    function showAttendanceStatus(message, className) {
+      attendanceStatus.style.display = "block";
+      attendanceStatus.textContent = message;
+      attendanceStatus.className = `text-xs mt-2 ${className}`;
+    }
+
+    // Calculate distance between two GPS coordinates (Haversine formula)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3; // Earth's radius in meters
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+      return R * c; // Distance in meters
+    }
+
+    // Get local IP using WebRTC as fallback
+    async function getLocalIP() {
+      return new Promise((resolve) => {
+        try {
+          const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+          });
+
+          pc.createDataChannel("");
+          pc.createOffer()
+            .then(offer => pc.setLocalDescription(offer))
+            .catch(() => resolve(null));
+
+          pc.onicecandidate = (ice) => {
+            if (!ice || !ice.candidate || !ice.candidate.candidate) return;
+            const match = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(ice.candidate.candidate);
+            if (match) {
+              pc.close();
+              resolve(match[1]);
+            }
+          };
+
+          // Timeout after 3 seconds
+          setTimeout(() => {
+            pc.close();
+            resolve(null);
+          }, 3000);
+        } catch (error) {
+          resolve(null);
+        }
+      });
+    }
 
     // Access the camera
     async function startCamera(deviceId = null) {
@@ -106,11 +201,12 @@
         console.error("Camera error:", err);
       }
     }
+
     function stopCamera() {
       if (video.srcObject) {
         video.srcObject.getTracks().forEach((track) => track.stop());
         video.srcObject = null;
-        switchBtn.style.display = "none"; // Hide switch button
+        switchBtn.style.display = "none";
       }
     }
 
@@ -136,222 +232,320 @@
       await startCamera(videoDevices[deviceIndex].deviceId || null);
     });
 
+    resetDataBtn.addEventListener("click", () => {
+      if (confirm("Are you sure you want to reset all attendance data? This cannot be undone.")) {
+        localStorage.removeItem('attendanceRegistration');
+        localStorage.removeItem('attendanceHistory');
+        isRegistered = false;
+        captureBtn.textContent = "Register Face";
+        showAttendanceStatus("📝 Data reset. Please register your face first", "text-blue-600");
+      }
+    });
+
     captureBtn.addEventListener("click", async () => {
+      if (!isModelsLoaded) {
+        alert("AI models are still loading. Please wait...");
+        return;
+      }
+
       // Show loading state
-      captureBtn.textContent = "Capturing...";
+      captureBtn.textContent = "Processing...";
       captureBtn.disabled = true;
       locationStatus.style.display = "block";
-      locationStatus.textContent = "🌍 Getting location...";
+      locationStatus.textContent = "🔍 Detecting face...";
 
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Get IP address
-      let ipText = "IP: Unknown";
       try {
-        const ipRes = await fetch("https://api.ipify.org?format=json");
-        const ipData = await ipRes.json();
-        ipText = `IP: ${ipData.ip}`;
-      } catch (e) {
-        console.warn("Could not fetch IP", e);
-      }
+        // Detect face and get descriptor
+        const detection = await faceapi
+          .detectSingleFace(canvas)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
 
-      // Enhanced geolocation with better options and error handling
-      if ("geolocation" in navigator) {
-        const options = {
-          enableHighAccuracy: true,
-          timeout: 10000, // 10 seconds timeout
-          maximumAge: 60000 // Accept cached position up to 1 minute old
-        };
+        if (!detection) {
+          captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
+          captureBtn.disabled = false;
+          locationStatus.style.display = "none";
+          showAttendanceStatus("❌ No face detected. Please ensure your face is clearly visible.", "text-red-600");
+          return;
+        }
 
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
+        locationStatus.textContent = "🌍 Getting location...";
+
+        // Get IP address with multiple fallback options
+        let ipText = "IP: Unknown";
+        try {
+          // Try local server first (if running via server)
+          const ipServices = [
+            "/api/ip",  // Local server endpoint
+            "https://api.ipify.org?format=json",
+            "https://ipapi.co/json/",
+            "https://api.my-ip.io/ip.json",
+            "https://httpbin.org/ip",
+            "https://api.bigdatacloud.net/data/client-ip"
+          ];
+
+          for (const service of ipServices) {
             try {
-              const coords = pos.coords;
-              const timestamp = new Date(pos.timestamp);
-
-              // Detailed location information
-              const lat = coords.latitude.toFixed(6);
-              const lon = coords.longitude.toFixed(6);
-              const accuracy = coords.accuracy ? Math.round(coords.accuracy) : 'Unknown';
-              const altitude = coords.altitude ? coords.altitude.toFixed(1) + 'm' : 'Unknown';
-              const altitudeAccuracy = coords.altitudeAccuracy ? Math.round(coords.altitudeAccuracy) + 'm' : 'Unknown';
-              const heading = coords.heading !== null ? coords.heading.toFixed(1) + '°' : 'Unknown';
-              const speed = coords.speed !== null ? (coords.speed * 3.6).toFixed(1) + ' km/h' : 'Unknown';
-
-              // Try to get address using reverse geocoding
-              locationStatus.textContent = "🏠 Getting address...";
-              let addressText = '';
-              try {
-                const geocodeRes = await fetch(
-                  `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-                );
-                const geocodeData = await geocodeRes.json();
-                if (geocodeData.locality || geocodeData.city || geocodeData.countryName) {
-                  const location = [
-                    geocodeData.locality || geocodeData.city,
-                    geocodeData.principalSubdivision,
-                    geocodeData.countryName
-                  ].filter(Boolean).join(', ');
-                  addressText = location;
+              const response = await fetch(service, {
+                method: 'GET',
+                timeout: 3000,
+                headers: {
+                  'Accept': 'application/json'
                 }
-              } catch (e) {
-                console.warn("Could not fetch address", e);
-              }
-
-              // Prepare text overlays with better formatting
-              const locationTexts = [
-                `📍 ${lat}, ${lon}`,
-                `📍 Accuracy: ±${accuracy}m`,
-                altitude !== 'Unknown' ? `⛰️ Alt: ${altitude} (±${altitudeAccuracy})` : null,
-                heading !== 'Unknown' ? `🧭 Heading: ${heading}` : null,
-                speed !== 'Unknown' ? `🚀 Speed: ${speed}` : null,
-                addressText ? `🏠 ${addressText}` : null,
-                `🕐 ${timestamp.toLocaleString()}`,
-                `💻 ${ipText}`
-              ].filter(Boolean);
-
-              // Enhanced text styling
-              ctx.font = "16px Arial";
-              ctx.fillStyle = "white";
-              ctx.strokeStyle = "black";
-              ctx.lineWidth = 2;
-              ctx.shadowColor = "rgba(0,0,0,0.7)";
-              ctx.shadowBlur = 4;
-              ctx.shadowOffsetX = 1;
-              ctx.shadowOffsetY = 1;
-
-              // Draw background rectangle for better readability
-              const padding = 10;
-              const lineHeight = 22;
-              const textHeight = locationTexts.length * lineHeight + padding * 2;
-              const maxTextWidth = Math.max(...locationTexts.map(text => ctx.measureText(text).width));
-
-              ctx.fillStyle = "rgba(0,0,0,0.7)";
-              ctx.shadowColor = "transparent";
-              ctx.fillRect(5, canvas.height - textHeight - 5, maxTextWidth + padding * 2, textHeight);
-
-              // Draw text
-              ctx.fillStyle = "white";
-              ctx.shadowColor = "rgba(0,0,0,0.7)";
-              locationTexts.forEach((text, index) => {
-                const y = canvas.height - textHeight + padding + (index + 1) * lineHeight;
-                ctx.fillText(text, padding + 5, y);
               });
 
-              // Reset button state and show result
-              captureBtn.textContent = "Capture Photo";
+              if (response.ok) {
+                const data = await response.text();
+                let ip = null;
+
+                // Handle different response formats
+                try {
+                  const jsonData = JSON.parse(data);
+                  ip = jsonData.ip || jsonData.origin || jsonData.ipAddress || jsonData.query;
+                } catch {
+                  // If not JSON, treat as plain text
+                  ip = data.trim();
+                }
+
+                if (ip && (ip.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) || ip === '127.0.0.1')) {
+                  ipText = `IP: ${ip}`;
+                  break;
+                }
+              }
+            } catch (serviceError) {
+              console.warn(`Failed to get IP from ${service}:`, serviceError);
+              continue;
+            }
+          }
+
+          // If all services fail, try WebRTC method as last resort
+          if (ipText === "IP: Unknown") {
+            const rtcIp = await getLocalIP();
+            if (rtcIp) {
+              ipText = `Local IP: ${rtcIp}`;
+            } else {
+              // Final fallback - show browser and timestamp info instead
+              const userAgent = navigator.userAgent;
+              const browser = userAgent.includes('Chrome') ? 'Chrome' :
+                userAgent.includes('Firefox') ? 'Firefox' :
+                  userAgent.includes('Safari') ? 'Safari' : 'Unknown';
+              ipText = `Browser: ${browser} | No IP available`;
+            }
+          }
+
+        } catch (e) {
+          console.warn("Could not fetch IP from any service", e);
+        }
+
+        // Enhanced geolocation
+        if ("geolocation" in navigator) {
+          const options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          };
+
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              try {
+                const coords = pos.coords;
+                const timestamp = new Date(pos.timestamp);
+                const lat = coords.latitude;
+                const lon = coords.longitude;
+                const accuracy = coords.accuracy ? Math.round(coords.accuracy) : 'Unknown';
+
+                if (!isRegistered) {
+                  // First time registration
+                  await registerUser(detection.descriptor, lat, lon, timestamp, ipText, accuracy);
+                } else {
+                  // Attendance verification
+                  await verifyAttendance(detection.descriptor, lat, lon, timestamp, ipText, accuracy);
+                }
+
+              } catch (error) {
+                console.error("Error processing:", error);
+                captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
+                captureBtn.disabled = false;
+                locationStatus.style.display = "none";
+                showAttendanceStatus("❌ Error processing attendance", "text-red-600");
+              }
+            },
+            (err) => {
+              captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
               captureBtn.disabled = false;
               locationStatus.style.display = "none";
-              canvas.style.display = "block";
-              downloadBtn.style.display = "inline-block";
-              reCaptureBtn.style.display = "inline-block";
-              video.style.display = "none";
-              captureBtn.style.display = "none";
-              stopCamera();
+              showAttendanceStatus("❌ Location access denied. Cannot process attendance.", "text-red-600");
+            },
+            options
+          );
+        } else {
+          showAttendanceStatus("❌ Geolocation not supported", "text-red-600");
+        }
 
-            } catch (error) {
-              console.error("Error processing location data:", error);
-              captureBtn.textContent = "Capture Photo";
-              captureBtn.disabled = false;
-              locationStatus.style.display = "none";
-              alert("Error processing location data. Photo captured without enhanced location info.");
-
-              // Fallback to basic location display
-              const lat = pos.coords.latitude.toFixed(5);
-              const lon = pos.coords.longitude.toFixed(5);
-              ctx.font = "20px Arial";
-              ctx.fillStyle = "white";
-              ctx.strokeStyle = "black";
-              ctx.lineWidth = 3;
-              ctx.strokeText(`Lat: ${lat}, Lon: ${lon}`, 10, canvas.height - 50);
-              ctx.fillText(`Lat: ${lat}, Lon: ${lon}`, 10, canvas.height - 50);
-              ctx.strokeText(ipText, 10, canvas.height - 15);
-              ctx.fillText(ipText, 10, canvas.height - 15);
-
-              canvas.style.display = "block";
-              downloadBtn.style.display = "inline-block";
-              reCaptureBtn.style.display = "inline-block";
-              video.style.display = "none";
-              captureBtn.style.display = "none";
-              stopCamera();
-            }
-          },
-          (err) => {
-            captureBtn.textContent = "Capture Photo";
-            captureBtn.disabled = false;
-            locationStatus.style.display = "none";
-
-            let errorMessage = "Failed to get location: ";
-            switch (err.code) {
-              case err.PERMISSION_DENIED:
-                errorMessage += "Location access denied by user.";
-                break;
-              case err.POSITION_UNAVAILABLE:
-                errorMessage += "Location information unavailable.";
-                break;
-              case err.TIMEOUT:
-                errorMessage += "Location request timed out.";
-                break;
-              default:
-                errorMessage += "Unknown error occurred.";
-                break;
-            }
-
-            alert(errorMessage + " Photo will be captured without location data.");
-
-            // Capture photo without location data
-            ctx.font = "20px Arial";
-            ctx.fillStyle = "white";
-            ctx.strokeStyle = "black";
-            ctx.lineWidth = 3;
-            ctx.strokeText("Location: Unavailable", 10, canvas.height - 50);
-            ctx.fillText("Location: Unavailable", 10, canvas.height - 50);
-            ctx.strokeText(ipText, 10, canvas.height - 15);
-            ctx.fillText(ipText, 10, canvas.height - 15);
-
-            canvas.style.display = "block";
-            downloadBtn.style.display = "inline-block";
-            reCaptureBtn.style.display = "inline-block";
-            video.style.display = "none";
-            captureBtn.style.display = "none";
-            stopCamera();
-          },
-          options
-        );
-      } else {
-        captureBtn.textContent = "Capture Photo";
+      } catch (error) {
+        console.error("Face detection error:", error);
+        captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
         captureBtn.disabled = false;
         locationStatus.style.display = "none";
-        alert("Geolocation not supported by this browser.");
-
-        // Capture photo without geolocation
-        ctx.font = "20px Arial";
-        ctx.fillStyle = "white";
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 3;
-        ctx.strokeText("Geolocation: Not supported", 10, canvas.height - 50);
-        ctx.fillText("Geolocation: Not supported", 10, canvas.height - 50);
-        ctx.strokeText(ipText, 10, canvas.height - 15);
-        ctx.fillText(ipText, 10, canvas.height - 15);
-
-        canvas.style.display = "block";
-        downloadBtn.style.display = "inline-block";
-        reCaptureBtn.style.display = "inline-block";
-        video.style.display = "none";
-        captureBtn.style.display = "none";
-        stopCamera();
+        showAttendanceStatus("❌ Face detection failed", "text-red-600");
       }
     });
 
+    async function registerUser(faceDescriptor, lat, lon, timestamp, ipText, accuracy) {
+      locationStatus.textContent = "💾 Registering user...";
+
+      const registrationData = {
+        faceDescriptor: Array.from(faceDescriptor),
+        location: { lat, lon },
+        timestamp: timestamp.toISOString(),
+        ipAddress: ipText,
+        accuracy: accuracy
+      };
+
+      localStorage.setItem('attendanceRegistration', JSON.stringify(registrationData));
+
+      // Draw registration info on canvas
+      drawRegistrationInfo(lat, lon, timestamp, ipText, accuracy);
+
+      isRegistered = true;
+      captureBtn.textContent = "Mark Attendance";
+      captureBtn.disabled = false;
+      locationStatus.style.display = "none";
+      showAttendanceStatus("✅ Face registered successfully! You can now mark attendance.", "text-green-600");
+
+      // Show capture result
+      showCaptureResult();
+    }
+
+    async function verifyAttendance(faceDescriptor, lat, lon, timestamp, ipText, accuracy) {
+      locationStatus.textContent = "🔍 Verifying identity...";
+
+      const registrationData = JSON.parse(localStorage.getItem('attendanceRegistration'));
+      const registeredDescriptor = new Float32Array(registrationData.faceDescriptor);
+
+      // Calculate face similarity
+      const distance = faceapi.euclideanDistance(faceDescriptor, registeredDescriptor);
+      const isFaceMatch = distance < FACE_MATCH_THRESHOLD;
+
+      locationStatus.textContent = "📍 Checking location...";
+
+      // Calculate location distance
+      const locationDistance = calculateDistance(
+        lat, lon,
+        registrationData.location.lat, registrationData.location.lon
+      );
+      const isLocationMatch = locationDistance <= LOCATION_MATCH_THRESHOLD;
+
+      // Store attendance record
+      const attendanceRecord = {
+        timestamp: timestamp.toISOString(),
+        location: { lat, lon },
+        faceMatch: isFaceMatch,
+        faceDistance: distance.toFixed(4),
+        locationMatch: isLocationMatch,
+        locationDistance: Math.round(locationDistance),
+        ipAddress: ipText,
+        accuracy: accuracy,
+        success: isFaceMatch && isLocationMatch
+      };
+
+      // Save to history
+      let history = JSON.parse(localStorage.getItem('attendanceHistory') || '[]');
+      history.push(attendanceRecord);
+      localStorage.setItem('attendanceHistory', JSON.stringify(history));
+
+      // Draw attendance result on canvas
+      drawAttendanceResult(attendanceRecord, lat, lon, timestamp, ipText, accuracy);
+
+      captureBtn.disabled = false;
+      locationStatus.style.display = "none";
+
+      if (attendanceRecord.success) {
+        captureBtn.textContent = "Mark Attendance";
+        showAttendanceStatus(`✅ Attendance marked successfully! Face: ${(1 - distance).toFixed(2) * 100}% match, Location: ${Math.round(locationDistance)}m away`, "text-green-600");
+      } else {
+        captureBtn.textContent = "Mark Attendance";
+        let errorMsg = "❌ Attendance failed: ";
+        if (!isFaceMatch) errorMsg += `Face mismatch (${(distance * 100).toFixed(1)}% difference). `;
+        if (!isLocationMatch) errorMsg += `Location too far (${Math.round(locationDistance)}m away).`;
+        showAttendanceStatus(errorMsg, "text-red-600");
+      }
+
+      // Show capture result
+      showCaptureResult();
+    }
+
+    function drawRegistrationInfo(lat, lon, timestamp, ipText, accuracy) {
+      const texts = [
+        "🎯 USER REGISTERED",
+        `📍 Location: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+        `📍 Accuracy: ±${accuracy}m`,
+        `🕐 Time: ${timestamp.toLocaleString()}`,
+        `💻 ${ipText}`,
+        "✅ Ready for attendance verification"
+      ];
+
+      drawInfoOnCanvas(texts, "rgba(0,128,0,0.8)");
+    }
+
+    function drawAttendanceResult(record, lat, lon, timestamp, ipText, accuracy) {
+      const texts = [
+        record.success ? "✅ ATTENDANCE MARKED" : "❌ ATTENDANCE FAILED",
+        `👤 Face Match: ${record.faceMatch ? 'YES' : 'NO'} (${(1 - record.faceDistance) * 100}%)`,
+        `📍 Location Match: ${record.locationMatch ? 'YES' : 'NO'} (${record.locationDistance}m)`,
+        `📍 Current: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+        `🕐 Time: ${timestamp.toLocaleString()}`,
+        `💻 ${ipText}`
+      ];
+
+      const bgColor = record.success ? "rgba(0,128,0,0.8)" : "rgba(220,38,38,0.8)";
+      drawInfoOnCanvas(texts, bgColor);
+    }
+
+    function drawInfoOnCanvas(texts, backgroundColor) {
+      ctx.font = "16px Arial";
+      ctx.fillStyle = "white";
+      ctx.strokeStyle = "black";
+      ctx.lineWidth = 2;
+
+      const padding = 10;
+      const lineHeight = 22;
+      const textHeight = texts.length * lineHeight + padding * 2;
+      const maxTextWidth = Math.max(...texts.map(text => ctx.measureText(text).width));
+
+      // Draw background
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(5, canvas.height - textHeight - 5, maxTextWidth + padding * 2, textHeight);
+
+      // Draw text
+      ctx.fillStyle = "white";
+      texts.forEach((text, index) => {
+        const y = canvas.height - textHeight + padding + (index + 1) * lineHeight;
+        ctx.fillText(text, padding + 5, y);
+      });
+    }
+
+    function showCaptureResult() {
+      canvas.style.display = "block";
+      downloadBtn.style.display = "inline-block";
+      reCaptureBtn.style.display = "inline-block";
+      video.style.display = "none";
+      captureBtn.style.display = "none";
+      stopCamera();
+    }
+
     reCaptureBtn.addEventListener("click", () => {
-      video.style.display = "block"; // Show video again
-      captureBtn.style.display = "inline-block"; // Show capture button again
-      canvas.style.display = "none"; // Hide canvas
-      downloadBtn.style.display = "none"; // Hide download button
-      reCaptureBtn.style.display = "none"; // Hide recapture button
-      switchBtn.style.display = "inline-block"; // Show switch button
+      video.style.display = "block";
+      captureBtn.style.display = "inline-block";
+      canvas.style.display = "none";
+      downloadBtn.style.display = "none";
+      reCaptureBtn.style.display = "none";
+      switchBtn.style.display = "inline-block";
+      attendanceStatus.style.display = "none";
       (async () => {
         await getVideoDevices();
         await startCamera(videoDevices[deviceIndex]?.deviceId);
@@ -362,14 +556,17 @@
       const link = document.createElement("a");
       const now = new Date();
       const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      link.download = `geotagged-photo-${timestamp}.png`;
+      const prefix = isRegistered ? 'attendance' : 'registration';
+      link.download = `${prefix}-${timestamp}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     });
 
+    // Initialize the application
     (async () => {
       await getVideoDevices();
       await startCamera(videoDevices[deviceIndex]?.deviceId);
+      await loadModels();
     })();
   </script>
 </body>

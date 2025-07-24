@@ -1,59 +1,133 @@
----
-Project: "GeoTagger"
-Author: "Priyangsu"
-Published: "12 May 2025"
----
+# Smart Attendance System
 
-## GeoTagger
+An intelligent attendance system that combines facial recognition with GPS location verification for secure and accurate attendance tracking.
 
-**GeoTagger** is a browser-based camera tool that captures photos directly from a device's camera and embeds real-time metadata—including GPS coordinates and IP address—onto the image. It is designed for field documentation, digital forensics, and geolocation-based reporting without needing native apps or installations.
+## Features
 
-### Features
+🎯 **Face Recognition**: Uses AI-powered facial recognition to identify users
+📍 **Location Verification**: GPS-based location matching for attendance validation  
+💾 **Local Storage**: All data stored locally for testing purposes
+📊 **Dashboard**: View attendance history and statistics
+🔒 **Security**: Dual verification (face + location) for enhanced security
 
-- 📷 Captures photos directly using the device camera.
-- 🌍 Embeds **latitude**, **longitude**, and **public IP address** on the image.
-- 🧠 Works entirely in-browser with no server dependency.
-- 🧾 Allows instant download of the location-stamped image.
-- 🔒 No data is sent to any backend or stored—privacy first.
+## How to Use
 
-### How It Works
+### Initial Setup
 
-When the user clicks “Capture Photo,” the app:
+1. Open `index.html` in your web browser
+2. Allow camera and location permissions when prompted
+3. Wait for AI models to load (first time may take a few moments)
 
-1. Accesses the live camera stream using `getUserMedia()`.
-2. Captures a frame and draws it on a `<canvas>`.
-3. Retrieves the user’s current geolocation and IP address.
-4. Overlays the location and IP text onto the image.
-5. Allows the image to be downloaded as a PNG.
+### Registration (First Time)
 
-### Metadata Embedded on Photo
+1. Click "Register Face" button
+2. Position your face clearly in the camera view
+3. The system will detect your face and capture your location
+4. Registration complete! Your face and location are now stored
 
-Example of information printed on the captured image:
-Lat: 22.5726, Lon: 88.3639
-IP: 103.24.XXX.XXX
+### Marking Attendance
 
-### Fair Usage Policy
+1. After registration, the button changes to "Mark Attendance"
+2. Position your face in the camera view
+3. The system will:
+   - Detect and match your face with registered data
+   - Verify your current location against registered location
+   - Mark attendance as successful only if both face and location match
 
-This project is intended for **ethical**, **transparent**, and **privacy-respecting** use cases such as:
+### Viewing Results
 
-- Field survey & inspection
-- Journalism & citizen reporting
-- Pet rescue / event verification
-- Location-based audits
+- **Green status**: Attendance marked successfully
+- **Red status**: Attendance failed (face mismatch or wrong location)
+- Use "Download Photo" to save the captured image with verification info
 
-**You must not:**
+### Dashboard
 
-- Use this tool for covert surveillance or unauthorized tracking
-- Store or distribute captured data without user consent
-- Violate any applicable data protection laws (e.g., GDPR, CCPA)
+- Open `attendance-dashboard.html` to view:
+  - Registration status
+  - Attendance statistics
+  - Complete attendance history
+  - Export/clear data options
 
-### Live Demo
+## Configuration
 
-Try the tool live at: [View Live](https://priyangsubanerjee.github.io/geo-tagger/)
+You can adjust these parameters in the code:
 
-### Author
+```javascript
+const FACE_MATCH_THRESHOLD = 0.6; // Lower = stricter face matching
+const LOCATION_MATCH_THRESHOLD = 100; // Maximum distance in meters
+```
 
-Built with ❤️ by **[@priyangsubanerjee](https://github.com/priyangsubanerjee)**.  
-This project is open-source and welcomes contributions, suggestions, and issue reports.
+## Data Storage
 
-For improvements or to report bugs, feel free to open a pull request or raise an issue on GitHub.
+For testing purposes, all data is stored in browser's localStorage:
+
+- `attendanceRegistration`: User's face descriptor and location
+- `attendanceHistory`: Array of all attendance attempts
+
+## Technical Details
+
+### Face Recognition
+
+- Uses face-api.js library with SSD MobileNet v1 for face detection
+- 68-point facial landmark detection for alignment
+- 128-dimensional face descriptors for recognition
+- Euclidean distance calculation for face matching
+
+### Location Verification
+
+- GPS coordinates with high accuracy mode
+- Haversine formula for distance calculation
+- Configurable distance threshold for location matching
+
+### Security Features
+
+- Dual verification (face + location) prevents spoofing
+- Face descriptor encryption prevents reconstruction
+- Location accuracy validation
+- Timestamp verification
+
+## Browser Compatibility
+
+- ✅ Chrome/Edge (Recommended)
+- ✅ Firefox
+- ✅ Safari (iOS may need additional permissions)
+- ⚠️ Requires HTTPS for camera access (except localhost)
+
+## Files Structure
+
+```
+geo-tagger/
+├── index.html              # Main attendance system
+├── attendance-dashboard.html # Statistics dashboard
+├── face-api.min.js         # Face recognition library
+├── weights/                # AI model files
+│   ├── ssd_mobilenetv1_model-*
+│   ├── face_landmark_68_model-*
+│   └── face_recognition_model-*
+└── README.md              # This file
+```
+
+## Development Notes
+
+This is a testing/demonstration system. For production use:
+
+- Implement server-side storage
+- Add user authentication
+- Encrypt face descriptors
+- Add audit logging
+- Implement backup/sync features
+- Add administrative controls
+
+## Troubleshooting
+
+**Models not loading**: Ensure weights folder is present and accessible
+**Camera not working**: Check browser permissions and HTTPS requirement
+**Face not detected**: Ensure good lighting and face is clearly visible
+**Location errors**: Enable location services and check GPS signal
+**Storage full**: Use "Reset Data" button to clear localStorage
+
+## Credits
+
+- Face recognition: [face-api.js](https://github.com/justadudewhohacks/face-api.js)
+- UI Framework: [Tailwind CSS](https://tailwindcss.com)
+- Icons: Unicode emoji characters
