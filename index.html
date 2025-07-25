@@ -17,8 +17,42 @@
       </div>
       <div class="flex items-center mt-1">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-8" viewBox="0 0 24 24">
-          <path fill="currentColor"
-            d="M12.275 9H19.4q-.675-1.725-2.062-2.963T14.15 4.3l-2.3 3.95q-.15.25 0 .5t.425.25m-3.6 1.25q.15.25.425.25t.425-.25L13.1 4.1q-.275-.05-.55-.075T12 4q-1.65 0-3.075.625T6.4 6.3zM4.25 14h4.575q.275 0 .438-.25t.012-.5L5.7 7.1q-.8 1.025-1.25 2.263T4 12q0 .525.063 1.013T4.25 14m5.6 5.7l2.275-3.95q.15-.25-.012-.5t-.438-.25H4.6q.675 1.725 2.063 2.963T9.85 19.7M12 20q1.65 0 3.075-.625T17.6 17.7l-2.275-3.95q-.15-.25-.425-.25t-.425.25L10.9 19.9q.275.05.538.075T12 20m6.3-3.1q.8-1.025 1.25-2.262T20 12q0-.525-.062-1.012T19.75 10h-4.575q-.275 0-.437.25t-.013.5zM12 22q-2.05 0-3.875-.788t-3.187-2.15t-2.15-3.187T2 12q0-2.075.788-3.887t2.15-3.175t3.187-2.15T12 2q2.075 0 3.888.788t3.174 2.15t2.15 3.175T22 12q0 2.05-.788 3.875t-2.15 3.188t-3.175 2.15T12 22" />
+          function drawRegistrati function drawAttendanceResult(record, lat, lon, timestamp, ipText, accuracy) {
+          const texts = [
+          record.success ? "✅ ATTENDANCE MARKED" : "❌ ATTENDANCE FAILED",
+          `🤖 Detector: ${currentFaceDetector.toUpperCase()}`,
+          `👁️ Liveness: VERIFIED (${blinkCount} blinks, EAR: ${EAR_THRESHOLD})`,
+          `👤 Face Match: ${record.faceMatch ? 'YES' : 'NO'} (${(1 - record.faceDistance) * 100}%)`,
+          `📍 Location Match: ${record.locationMatch ? 'YES' : 'NO'} (${record.locationDistance}m)`,
+          `📍 Current: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+          `🕐 Time: ${timestamp.toLocaleString()}`,
+          `💻 ${ipText}`
+          ];
+
+          const bgColor = record.success ? "rgba(0,128,0,0.8)" : "rgba(220,38,38,0.8)";
+          drawInfoOnCanvas(texts, bgColor);
+          }n, timestamp, ipText, accuracy) {
+          const texts = [
+          "🎯 USER REGISTERED",
+          `🤖 Detector: ${currentFaceDetector.toUpperCase()}`,
+          `👁️ Liveness: VERIFIED (${blinkCount} blinks, EAR: ${EAR_THRESHOLD})`,
+          `📍 Location: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+          `📍 Accuracy: ±${accuracy}m`,
+          `🕐 Time: ${timestamp.toLocaleString()}`,
+          `💻 ${ipText}`,
+          "✅ Ready for attendance verification"
+          ];
+
+          drawInfoOnCanvas(texts, "rgba(0,128,0,0.8)");
+          }ill="currentColor"
+          d="M12.275 9H19.4q-.675-1.725-2.062-2.963T14.15 4.3l-2.3 3.95q-.15.25 0 .5t.425.25m-3.6
+          1.25q.15.25.425.25t.425-.25L13.1 4.1q-.275-.05-.55-.075T12 4q-1.65 0-3.075.625T6.4 6.3zM4.25 14h4.575q.275 0
+          .438-.25t.012-.5L5.7 7.1q-.8 1.025-1.25 2.263T4 12q0 .525.063 1.013T4.25 14m5.6
+          5.7l2.275-3.95q.15-.25-.012-.5t-.438-.25H4.6q.675 1.725 2.063 2.963T9.85 19.7M12 20q1.65 0 3.075-.625T17.6
+          17.7l-2.275-3.95q-.15-.25-.425-.25t-.425.25L10.9 19.9q.275.05.538.075T12 20m6.3-3.1q.8-1.025 1.25-2.262T20
+          12q0-.525-.062-1.012T19.75 10h-4.575q-.275 0-.437.25t-.013.5zM12 22q-2.05
+          0-3.875-.788t-3.187-2.15t-2.15-3.187T2 12q0-2.075.788-3.887t2.15-3.175t3.187-2.15T12 2q2.075 0 3.888.788t3.174
+          2.15t2.15 3.175T22 12q0 2.05-.788 3.875t-2.15 3.188t-3.175 2.15T12 22" />
         </svg>
         <h1 class="font-semibold text-xl text-neutral-800 ml-2">Smart Attendance</h1>
       </div>
@@ -88,13 +122,30 @@
     const FACE_MATCH_THRESHOLD = 0.6; // Lower means stricter matching
     const LOCATION_MATCH_THRESHOLD = 100; // meters
 
+    // Eye blink detection configuration
+    const EAR_THRESHOLD = 0.3; // Eye Aspect Ratio threshold for blink detection (tested value)
+    const CONSECUTIVE_FRAMES = 3; // Number of consecutive frames below threshold to register a blink
+    const REQUIRED_BLINKS = 2; // Number of blinks required for liveness verification
+    let blinkCount = 0;
+    let consecutiveFrames = 0;
+    let earHistory = [];
+    let isLivenessCheckActive = false;
+    let livenessCheckTimeout = null;
+
+    // Face detector configuration
+    let currentFaceDetector = 'ssd'; // 'ssd' or 'tiny'
+    let detectionRetryCount = 0;
+    const MAX_RETRY_ATTEMPTS = 2;
+
     // Load face-api.js models
     async function loadModels() {
       try {
         locationStatus.style.display = "block";
         locationStatus.textContent = "📥 Loading AI models...";
 
+        // Load both face detectors for fallback capability
         await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
 
@@ -121,6 +172,178 @@
       attendanceStatus.style.display = "block";
       attendanceStatus.textContent = message;
       attendanceStatus.className = `text-xs mt-2 ${className}`;
+    }
+
+    // Get face detector options based on current detector
+    function getFaceDetectorOptions() {
+      if (currentFaceDetector === 'ssd') {
+        return new faceapi.SsdMobilenetv1Options({
+          minConfidence: 0.5,
+          maxResults: 1
+        });
+      } else {
+        return new faceapi.TinyFaceDetectorOptions({
+          inputSize: 416,
+          scoreThreshold: 0.5
+        });
+      }
+    }
+
+    // Switch to fallback detector
+    function switchToFallbackDetector() {
+      if (currentFaceDetector === 'ssd') {
+        currentFaceDetector = 'tiny';
+        showAttendanceStatus("🔄 Switching to Tiny Face Detector for better detection...", "text-blue-600");
+        return true;
+      }
+      return false; // No more fallbacks available
+    }
+
+    // Detect face with fallback capability
+    async function detectFaceWithFallback(inputElement) {
+      let detection = null;
+      let attempts = 0;
+
+      while (attempts <= MAX_RETRY_ATTEMPTS && !detection) {
+        try {
+          const options = getFaceDetectorOptions();
+
+          if (currentFaceDetector === 'ssd') {
+            detection = await faceapi
+              .detectSingleFace(inputElement, options)
+              .withFaceLandmarks()
+              .withFaceDescriptor();
+          } else {
+            detection = await faceapi
+              .detectSingleFace(inputElement, options)
+              .withFaceLandmarks()
+              .withFaceDescriptor();
+          }
+
+          if (!detection && attempts < MAX_RETRY_ATTEMPTS) {
+            attempts++;
+            if (switchToFallbackDetector()) {
+              locationStatus.textContent = `🔄 Retrying with ${currentFaceDetector.toUpperCase()} detector (${attempts + 1}/${MAX_RETRY_ATTEMPTS + 1})...`;
+              await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause before retry
+            } else {
+              break;
+            }
+          } else {
+            break;
+          }
+        } catch (error) {
+          console.error(`Face detection error with ${currentFaceDetector}:`, error);
+          attempts++;
+          if (attempts <= MAX_RETRY_ATTEMPTS && switchToFallbackDetector()) {
+            locationStatus.textContent = `🔄 Retrying with ${currentFaceDetector.toUpperCase()} detector (${attempts + 1}/${MAX_RETRY_ATTEMPTS + 1})...`;
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (detection) {
+        showAttendanceStatus(`✅ Face detected using ${currentFaceDetector.toUpperCase()} detector`, "text-green-600");
+      }
+
+      return detection;
+    }
+
+    // Calculate Eye Aspect Ratio (EAR) for blink detection
+    function calculateEAR(eyeLandmarks) {
+      // eyeLandmarks should be an array of 6 points for one eye
+      // Points are in order: [outer_corner, top_left, top_right, inner_corner, bottom_right, bottom_left]
+
+      // Vertical distances
+      const verticalDist1 = Math.sqrt(
+        Math.pow(eyeLandmarks[1].x - eyeLandmarks[5].x, 2) +
+        Math.pow(eyeLandmarks[1].y - eyeLandmarks[5].y, 2)
+      );
+      const verticalDist2 = Math.sqrt(
+        Math.pow(eyeLandmarks[2].x - eyeLandmarks[4].x, 2) +
+        Math.pow(eyeLandmarks[2].y - eyeLandmarks[4].y, 2)
+      );
+
+      // Horizontal distance
+      const horizontalDist = Math.sqrt(
+        Math.pow(eyeLandmarks[0].x - eyeLandmarks[3].x, 2) +
+        Math.pow(eyeLandmarks[0].y - eyeLandmarks[3].y, 2)
+      );
+
+      // Calculate EAR
+      const ear = (verticalDist1 + verticalDist2) / (2.0 * horizontalDist);
+      return ear;
+    }
+
+    // Detect blink based on EAR
+    function detectBlink(landmarks) {
+      const leftEye = landmarks.getLeftEye();
+      const rightEye = landmarks.getRightEye();
+
+      const leftEAR = calculateEAR(leftEye);
+      const rightEAR = calculateEAR(rightEye);
+      const avgEAR = (leftEAR + rightEAR) / 2.0;
+
+      // Store EAR history for smoothing
+      earHistory.push(avgEAR);
+      if (earHistory.length > 10) {
+        earHistory.shift();
+      }
+
+      // Check if EAR is below threshold
+      if (avgEAR < EAR_THRESHOLD) {
+        consecutiveFrames++;
+      } else {
+        // If we had enough consecutive frames, count it as a blink
+        if (consecutiveFrames >= CONSECUTIVE_FRAMES) {
+          blinkCount++;
+          console.log(`Blink detected! Count: ${blinkCount}`);
+
+          if (isLivenessCheckActive) {
+            showAttendanceStatus(`👁️ Blink ${blinkCount}/${REQUIRED_BLINKS} detected`, "text-blue-600");
+          }
+        }
+        consecutiveFrames = 0;
+      }
+
+      return {
+        avgEAR: avgEAR,
+        blinkCount: blinkCount,
+        isBlinking: consecutiveFrames >= CONSECUTIVE_FRAMES
+      };
+    }
+
+    // Start liveness check
+    function startLivenessCheck() {
+      blinkCount = 0;
+      consecutiveFrames = 0;
+      earHistory = [];
+      isLivenessCheckActive = true;
+
+      showAttendanceStatus(`👁️ Please blink ${REQUIRED_BLINKS} times slowly`, "text-blue-600");
+
+      // Set timeout for liveness check (15 seconds)
+      livenessCheckTimeout = setTimeout(() => {
+        if (blinkCount < REQUIRED_BLINKS) {
+          isLivenessCheckActive = false;
+          captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
+          captureBtn.disabled = false;
+          locationStatus.style.display = "none";
+          showAttendanceStatus("❌ Liveness check failed. Please try again.", "text-red-600");
+        }
+      }, 15000);
+    }
+
+    // Check if liveness verification is complete
+    function checkLivenessComplete() {
+      if (isLivenessCheckActive && blinkCount >= REQUIRED_BLINKS) {
+        isLivenessCheckActive = false;
+        clearTimeout(livenessCheckTimeout);
+        showAttendanceStatus("✅ Liveness verified! Processing...", "text-green-600");
+        return true;
+      }
+      return false;
     }
 
     // Calculate distance between two GPS coordinates (Haversine formula)
@@ -248,6 +471,10 @@
         return;
       }
 
+      // Reset detector to SSD for new attempt
+      currentFaceDetector = 'ssd';
+      detectionRetryCount = 0;
+
       // Show loading state
       captureBtn.textContent = "Processing...";
       captureBtn.disabled = true;
@@ -259,132 +486,23 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       try {
-        // Detect face and get descriptor
-        const detection = await faceapi
-          .detectSingleFace(canvas)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
+        // Use enhanced face detection with fallback
+        const detection = await detectFaceWithFallback(canvas);
 
         if (!detection) {
           captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
           captureBtn.disabled = false;
           locationStatus.style.display = "none";
-          showAttendanceStatus("❌ No face detected. Please ensure your face is clearly visible.", "text-red-600");
+          showAttendanceStatus("❌ No face detected with any detector. Please ensure your face is clearly visible and try again.", "text-red-600");
           return;
         }
 
-        locationStatus.textContent = "🌍 Getting location...";
+        // Start liveness check instead of immediately proceeding
+        locationStatus.textContent = "👁️ Starting liveness check...";
+        startLivenessCheck();
 
-        // Get IP address with multiple fallback options
-        let ipText = "IP: Unknown";
-        try {
-          // Try local server first (if running via server)
-          const ipServices = [
-            "/api/ip",  // Local server endpoint
-            "https://api.ipify.org?format=json",
-            "https://ipapi.co/json/",
-            "https://api.my-ip.io/ip.json",
-            "https://httpbin.org/ip",
-            "https://api.bigdatacloud.net/data/client-ip"
-          ];
-
-          for (const service of ipServices) {
-            try {
-              const response = await fetch(service, {
-                method: 'GET',
-                timeout: 3000,
-                headers: {
-                  'Accept': 'application/json'
-                }
-              });
-
-              if (response.ok) {
-                const data = await response.text();
-                let ip = null;
-
-                // Handle different response formats
-                try {
-                  const jsonData = JSON.parse(data);
-                  ip = jsonData.ip || jsonData.origin || jsonData.ipAddress || jsonData.query;
-                } catch {
-                  // If not JSON, treat as plain text
-                  ip = data.trim();
-                }
-
-                if (ip && (ip.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) || ip === '127.0.0.1')) {
-                  ipText = `IP: ${ip}`;
-                  break;
-                }
-              }
-            } catch (serviceError) {
-              console.warn(`Failed to get IP from ${service}:`, serviceError);
-              continue;
-            }
-          }
-
-          // If all services fail, try WebRTC method as last resort
-          if (ipText === "IP: Unknown") {
-            const rtcIp = await getLocalIP();
-            if (rtcIp) {
-              ipText = `Local IP: ${rtcIp}`;
-            } else {
-              // Final fallback - show browser and timestamp info instead
-              const userAgent = navigator.userAgent;
-              const browser = userAgent.includes('Chrome') ? 'Chrome' :
-                userAgent.includes('Firefox') ? 'Firefox' :
-                  userAgent.includes('Safari') ? 'Safari' : 'Unknown';
-              ipText = `Browser: ${browser} | No IP available`;
-            }
-          }
-
-        } catch (e) {
-          console.warn("Could not fetch IP from any service", e);
-        }
-
-        // Enhanced geolocation
-        if ("geolocation" in navigator) {
-          const options = {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 60000
-          };
-
-          navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-              try {
-                const coords = pos.coords;
-                const timestamp = new Date(pos.timestamp);
-                const lat = coords.latitude;
-                const lon = coords.longitude;
-                const accuracy = coords.accuracy ? Math.round(coords.accuracy) : 'Unknown';
-
-                if (!isRegistered) {
-                  // First time registration
-                  await registerUser(detection.descriptor, lat, lon, timestamp, ipText, accuracy);
-                } else {
-                  // Attendance verification
-                  await verifyAttendance(detection.descriptor, lat, lon, timestamp, ipText, accuracy);
-                }
-
-              } catch (error) {
-                console.error("Error processing:", error);
-                captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
-                captureBtn.disabled = false;
-                locationStatus.style.display = "none";
-                showAttendanceStatus("❌ Error processing attendance", "text-red-600");
-              }
-            },
-            (err) => {
-              captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
-              captureBtn.disabled = false;
-              locationStatus.style.display = "none";
-              showAttendanceStatus("❌ Location access denied. Cannot process attendance.", "text-red-600");
-            },
-            options
-          );
-        } else {
-          showAttendanceStatus("❌ Geolocation not supported", "text-red-600");
-        }
+        // Start continuous landmark detection for blink monitoring
+        monitorBlinks(detection.descriptor);
 
       } catch (error) {
         console.error("Face detection error:", error);
@@ -395,6 +513,171 @@
       }
     });
 
+    // Monitor blinks continuously during liveness check
+    async function monitorBlinks(faceDescriptor) {
+      if (!isLivenessCheckActive) {
+        return;
+      }
+
+      try {
+        // Get current frame from video
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = video.videoWidth;
+        tempCanvas.height = video.videoHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+        // Use current detector for landmark detection during monitoring
+        const options = getFaceDetectorOptions();
+        const detection = await faceapi
+          .detectSingleFace(tempCanvas, options)
+          .withFaceLandmarks();
+
+        if (detection) {
+          const blinkData = detectBlink(detection.landmarks);
+
+          // Check if liveness is complete
+          if (checkLivenessComplete()) {
+            // Proceed with location and attendance processing
+            await proceedWithAttendance(faceDescriptor);
+            return;
+          }
+        } else {
+          // If face lost during monitoring, show warning but continue
+          if (isLivenessCheckActive) {
+            showAttendanceStatus(`👁️ Face lost during monitoring. Please stay still. Blink ${blinkCount}/${REQUIRED_BLINKS}`, "text-orange-600");
+          }
+        }
+
+        // Continue monitoring if still active
+        if (isLivenessCheckActive) {
+          setTimeout(() => monitorBlinks(faceDescriptor), 100); // Check every 100ms
+        }
+
+      } catch (error) {
+        console.error("Blink monitoring error:", error);
+        if (isLivenessCheckActive) {
+          setTimeout(() => monitorBlinks(faceDescriptor), 100);
+        }
+      }
+    }
+
+    // Proceed with attendance after liveness check
+    async function proceedWithAttendance(faceDescriptor) {
+      locationStatus.textContent = "🌍 Getting location...";
+
+      // Get IP address with multiple fallback options
+      let ipText = "IP: Unknown";
+      try {
+        // Try local server first (if running via server)
+        const ipServices = [
+          "/api/ip",  // Local server endpoint
+          "https://api.ipify.org?format=json",
+          "https://ipapi.co/json/",
+          "https://api.my-ip.io/ip.json",
+          "https://httpbin.org/ip",
+          "https://api.bigdatacloud.net/data/client-ip"
+        ];
+
+        for (const service of ipServices) {
+          try {
+            const response = await fetch(service, {
+              method: 'GET',
+              timeout: 3000,
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+
+            if (response.ok) {
+              const data = await response.text();
+              let ip = null;
+
+              // Handle different response formats
+              try {
+                const jsonData = JSON.parse(data);
+                ip = jsonData.ip || jsonData.origin || jsonData.ipAddress || jsonData.query;
+              } catch {
+                // If not JSON, treat as plain text
+                ip = data.trim();
+              }
+
+              if (ip && (ip.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) || ip === '127.0.0.1')) {
+                ipText = `IP: ${ip}`;
+                break;
+              }
+            }
+          } catch (serviceError) {
+            console.warn(`Failed to get IP from ${service}:`, serviceError);
+            continue;
+          }
+        }
+
+        // If all services fail, try WebRTC method as last resort
+        if (ipText === "IP: Unknown") {
+          const rtcIp = await getLocalIP();
+          if (rtcIp) {
+            ipText = `Local IP: ${rtcIp}`;
+          } else {
+            // Final fallback - show browser and timestamp info instead
+            const userAgent = navigator.userAgent;
+            const browser = userAgent.includes('Chrome') ? 'Chrome' :
+              userAgent.includes('Firefox') ? 'Firefox' :
+                userAgent.includes('Safari') ? 'Safari' : 'Unknown';
+            ipText = `Browser: ${browser} | No IP available`;
+          }
+        }
+
+      } catch (e) {
+        console.warn("Could not fetch IP from any service", e);
+      }
+
+      // Enhanced geolocation
+      if ("geolocation" in navigator) {
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
+        };
+
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            try {
+              const coords = pos.coords;
+              const timestamp = new Date(pos.timestamp);
+              const lat = coords.latitude;
+              const lon = coords.longitude;
+              const accuracy = coords.accuracy ? Math.round(coords.accuracy) : 'Unknown';
+
+              if (!isRegistered) {
+                // First time registration
+                await registerUser(faceDescriptor, lat, lon, timestamp, ipText, accuracy);
+              } else {
+                // Attendance verification
+                await verifyAttendance(faceDescriptor, lat, lon, timestamp, ipText, accuracy);
+              }
+
+            } catch (error) {
+              console.error("Error processing:", error);
+              captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
+              captureBtn.disabled = false;
+              locationStatus.style.display = "none";
+              showAttendanceStatus("❌ Error processing attendance", "text-red-600");
+            }
+          },
+          (err) => {
+            captureBtn.textContent = isRegistered ? "Mark Attendance" : "Register Face";
+            captureBtn.disabled = false;
+            locationStatus.style.display = "none";
+            showAttendanceStatus("❌ Location access denied. Cannot process attendance.", "text-red-600");
+          },
+          options
+        );
+      } else {
+        showAttendanceStatus("❌ Geolocation not supported", "text-red-600");
+      }
+    }
+
     async function registerUser(faceDescriptor, lat, lon, timestamp, ipText, accuracy) {
       locationStatus.textContent = "💾 Registering user...";
 
@@ -403,7 +686,11 @@
         location: { lat, lon },
         timestamp: timestamp.toISOString(),
         ipAddress: ipText,
-        accuracy: accuracy
+        accuracy: accuracy,
+        livenessVerified: true,
+        blinkCount: blinkCount,
+        detectorUsed: currentFaceDetector.toUpperCase(),
+        earThreshold: EAR_THRESHOLD
       };
 
       localStorage.setItem('attendanceRegistration', JSON.stringify(registrationData));
@@ -415,7 +702,7 @@
       captureBtn.textContent = "Mark Attendance";
       captureBtn.disabled = false;
       locationStatus.style.display = "none";
-      showAttendanceStatus("✅ Face registered successfully! You can now mark attendance.", "text-green-600");
+      showAttendanceStatus("✅ Face registered with liveness verification! You can now mark attendance.", "text-green-600");
 
       // Show capture result
       showCaptureResult();
@@ -450,6 +737,10 @@
         locationDistance: Math.round(locationDistance),
         ipAddress: ipText,
         accuracy: accuracy,
+        livenessVerified: true,
+        blinkCount: blinkCount,
+        detectorUsed: currentFaceDetector.toUpperCase(),
+        earThreshold: EAR_THRESHOLD,
         success: isFaceMatch && isLocationMatch
       };
 
@@ -482,7 +773,8 @@
     function drawRegistrationInfo(lat, lon, timestamp, ipText, accuracy) {
       const texts = [
         "🎯 USER REGISTERED",
-        `📍 Location: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+        `�️ Liveness: VERIFIED (${blinkCount} blinks)`,
+        `�📍 Location: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
         `📍 Accuracy: ±${accuracy}m`,
         `🕐 Time: ${timestamp.toLocaleString()}`,
         `💻 ${ipText}`,
@@ -495,7 +787,8 @@
     function drawAttendanceResult(record, lat, lon, timestamp, ipText, accuracy) {
       const texts = [
         record.success ? "✅ ATTENDANCE MARKED" : "❌ ATTENDANCE FAILED",
-        `👤 Face Match: ${record.faceMatch ? 'YES' : 'NO'} (${(1 - record.faceDistance) * 100}%)`,
+        `�️ Liveness: VERIFIED (${blinkCount} blinks)`,
+        `�👤 Face Match: ${record.faceMatch ? 'YES' : 'NO'} (${(1 - record.faceDistance) * 100}%)`,
         `📍 Location Match: ${record.locationMatch ? 'YES' : 'NO'} (${record.locationDistance}m)`,
         `📍 Current: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
         `🕐 Time: ${timestamp.toLocaleString()}`,
